@@ -17,3 +17,10 @@ logs/*.csv
 # Pliki IDE
 .vscode/
 .idea/
+
+# w .gitignore
+logs/
+snapshots/
+nn_champion.npy
+*.pyc
+__pycache__/

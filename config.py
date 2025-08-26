@@ -33,13 +33,21 @@ HOF_MAX = 5                 # Maksymalny rozmiar Hall of Fame (przechowuje najle
 EVAL_SEEDS_PER_ANCHOR = 2   # Na każdą parę (kandydat, kotwica) zagramy N seedów x 2 role (startujący/drugi)
                             # Całkowita liczba gier na kandydata = ANCHORS_COUNT * EVAL_SEEDS_PER_ANCHOR * 2
 
-# --- GA: Baselinowe DNA (opcjonalne kotwice startowe) ---
-# Można tu wkleić DNA agentów o znanych, ciekawych strategiach
+# --- GA: Baseline DNA (optional starting anchors) ---
+# Collection of DNA for agents with known, interesting strategies
 BASELINE_DNA_POOL = [
-    # Przykład 1: Agresywny gracz na punkty
+    # Example 1: Aggressive point-chaser
     [1.0, 0.8, -0.2, 0.6, 0.4, 0.2, -0.1, 0.3, 0.9, 0.7, -0.3, 0.5, 0.2, -0.2, 0.1, 0.4],
-    # Przykład 2: Gracz budujący "silnik" z kart
+    # Example 2: Engine-building card strategist
     [0.2, -0.6, 1.0, 0.7, -0.3, 0.4, 0.8, -0.5, 0.6, -0.1, 0.9, 0.3, -0.2, 0.5, 0.1, 0.7],
+    # Example 3: Defensive resource hoarder
+    [0.3, 0.1, -0.8, 0.4, 0.9, -0.2, 0.6, -0.4, 0.2, 0.5, -0.7, 0.3, 0.8, -0.1, 0.4, -0.3],
+    # Example 4: Balanced opportunist
+    [0.5, 0.4, 0.3, -0.2, 0.1, 0.6, -0.3, 0.5, -0.1, 0.4, 0.2, -0.5, 0.3, 0.7, -0.4, 0.2],
+    # Example 5: High-risk combo seeker
+    [-0.1, 0.9, 0.7, -0.3, 0.2, 0.8, -0.6, 0.4, 0.1, -0.2, 0.9, 0.5, -0.7, 0.3, 0.6, -0.5],
+    # Example 6: Late-game scaler
+    [0.4, -0.3, 0.6, 0.2, -0.5, 0.7, 0.1, -0.2, 0.8, 0.3, -0.4, 0.9, 0.2, -0.6, 0.5, 0.1],
 ]
 
 # --- Ustawienia Techniczne ---
@@ -72,7 +80,7 @@ SPEED_BONUS_WEIGHT = 1.2        # bonus za bycie szybszym (skaluje się z points
 PPT_WEIGHT = 2.0      # bonus za punkty/na turę
 
 # --- Limit tur bezpieczeństwa ---
-MAX_TURNS = 150                 # twardy limit tur w symulacji (seq + MP)
+MAX_TURNS = 100#150                 # twardy limit tur w symulacji (seq + MP)
 
 # --- Harmonogram trudności (anchors) ---
 ANCHOR_SCHEDULE_ENABLED = True

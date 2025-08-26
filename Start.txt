@@ -1,0 +1,23 @@
+Szybki start:
+
+    python train_nn.py --gens 150
+    LUB
+    python train_nn.py --gens 150 --anchors champion_agent.npy hof/top1.npy
+
+    
+    Po biegu: python eval_nn_vs_ga.py --seeds 128
+
+
+Bezpieczna i najprostsza ścieżka
+
+    Trenuj w szybkim presie (mała sieć, mały pop, mało seedów) np. 25–50 generacji.
+    Przerwij po zakończonym biegu, podnieś parametry w nn_config.py:
+        ANCHORS_COUNT: 4–6
+        EVAL_SEEDS_PER_ANCHOR: 6–10
+        USE_HOLDOUT: True (HOLDOUT_SEEDS_PER_ANCHOR: 8–12)
+        ES_POP: 64–96
+    Wznów z checkpointu:
+        python train_nn.py --gens 150 --resume nn_champion.npy
+
+Fast → accurate: 
+najlepiej „stop → zmień nn_config → --resume”.
