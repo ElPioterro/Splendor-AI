@@ -1,6 +1,3 @@
-Pewnie! Poniżej gotowy plik README_nn.md. Skopiuj do głównego katalogu repo.
-
-````markdown
 # PROMETHEUS — Odnoga „Neuroewolucja” (nn-agent)
 
 Agent NN trenowany metodą OpenES (CPU, numpy), kompatybilny z głównym silnikiem (SSOT), deterministyczny i lekki. Decyzje powstają przez ocenę f([state_vec, move_vec]) małą siecią MLP i wybór argmax.
@@ -61,7 +58,6 @@ Instalacja:
 pip install numpy tqdm pygame pytest
 # lub: pip install -r requirements.txt
 ```
-````
 
 ## Szybki start: trening
 
