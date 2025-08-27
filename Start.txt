@@ -2,7 +2,7 @@ Szybki start:
 
     python train_nn.py --gens 150
     LUB
-    python train_nn.py --gens 150 --anchors champion_agent.npy hof/top1.npy
+    python train_nn.py --gens 120 --anchors champion_agent.npy hof/top1.npy
 
     
     Po biegu: python eval_nn_vs_ga.py --seeds 128
@@ -21,3 +21,14 @@ Bezpieczna i najprostsza ścieżka
 
 Fast → accurate: 
 najlepiej „stop → zmień nn_config → --resume”.
+
+
+Wznowienie:
+
+    python train_nn.py --gens 120 --resume nn_champion.npy
+
+Po ~30–60 gen:
+
+    python viz_weights.py
+    python eval_nn_vs_ga.py --seeds 128
+

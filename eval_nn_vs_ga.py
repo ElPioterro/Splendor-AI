@@ -12,6 +12,38 @@ import game_engine as ge
 from agents import GeneticAgent
 from nn_agent import NnAgent
 import nn_config as cfg
+from feature_encoder import STATE_DIM, MOVE_DIM
+import random
+random.seed(cfg.SEED_BASE)
+np.random.seed(cfg.SEED_BASE & 0xFFFFFFFF)
+
+COLOR_ORDER = [ge.GemColor.WHITE, ge.GemColor.BLUE, ge.GemColor.GREEN, ge.GemColor.RED, ge.GemColor.BLACK]
+COLOR_TO_IDX = {c: i for i, c in enumerate(COLOR_ORDER)}
+
+def _move_sort_key(m: ge.Move):
+    if isinstance(m, ge.BuyCard):
+        return (0, m.card.level, m.card.id)
+    if isinstance(m, ge.ReserveVisibleCard):
+        return (1, m.card.level, m.card.id)
+    if isinstance(m, ge.ReserveFromDeck):
+        return (2, m.tier, 0)
+    if isinstance(m, ge.TakeThreeGems):
+        cols = tuple(sorted((COLOR_TO_IDX[c] for c in m.colors)))
+        return (3, cols)
+    if isinstance(m, ge.TakeTwoGems):
+        return (4, COLOR_TO_IDX[m.color])
+    return (99, repr(m))
+
+def canonicalize_moves(moves: list[ge.Move]) -> list[ge.Move]:
+    return sorted(moves, key=_move_sort_key)
+
+def infer_hidden_dims(theta_len: int, in_dim: int) -> tuple[int,int] | None:
+    for h1 in (32, 64, 128):
+        for h2 in (32, 64, 128):
+            p = in_dim*h1 + h1 + h1*h2 + h2 + h2 + 1
+            if p == theta_len:
+                return h1, h2
+    return None
 
 def wilson_lower_bound(p: float, n: int, z: float = cfg.WILSON_Z) -> float:
     if n <= 0:
@@ -29,7 +61,21 @@ def choose_noble_deterministic(eligible: list[ge.Noble]):
 
 def play_game(theta: np.ndarray, ga_dna: np.ndarray, as_first: bool, game_seed: int, tie_seed: int,
               cards, nobles) -> tuple[int, int, int]:
-    nn_agent = NnAgent(theta=theta, hidden1=cfg.HIDDEN1, hidden2=cfg.HIDDEN2, act=cfg.ACT, rng_seed=tie_seed)
+    # Per‑game determinism (gdyby GA używał global RNG)
+    random.seed(tie_seed)
+    np.random.seed(tie_seed & 0xFFFFFFFF)
+
+    # Auto‑dopasowanie architektury (zostaw jak masz)
+    try:
+        nn_agent = NnAgent(theta=theta, hidden1=cfg.HIDDEN1, hidden2=cfg.HIDDEN2, act=cfg.ACT, rng_seed=tie_seed)
+    except ValueError:
+        inferred = infer_hidden_dims(len(theta), STATE_DIM + MOVE_DIM)
+        if not inferred:
+            raise
+        h1, h2 = inferred
+        print(f"[eval] Auto-detected NN dims: H1={h1}, H2={h2}")
+        nn_agent = NnAgent(theta=theta, hidden1=h1, hidden2=h2, act=cfg.ACT, rng_seed=tie_seed)
+
     ga_agent = GeneticAgent(dna=ga_dna.copy())
 
     game = ge.Game(all_cards=cards, all_nobles=nobles, seed=game_seed)
@@ -38,27 +84,49 @@ def play_game(theta: np.ndarray, ga_dna: np.ndarray, as_first: bool, game_seed: 
     def is_nn_turn(state: ge.GameState) -> bool:
         return (state.current_player_index == 0) if as_first else (state.current_player_index == 1)
 
+    # BEZPIECZNIK: limit tur (jak w trenerze)
+    max_turns = int(getattr(config, "MAX_TURNS", 150))
+    turns = 0
+
     while not game.is_game_over():
         state = game.game_state
-        valid = game.get_valid_moves()
+        valid = canonicalize_moves(game.get_valid_moves())
         if not valid:
             game.finalize_turn(None)
+            turns += 1
+            if turns >= max_turns:
+                break
             continue
+
         if is_nn_turn(state):
             move, _ = nn_agent.choose_action(state, valid)
         else:
             move, _ = ga_agent.choose_action(state, valid)
+
         eligible = game.apply_move(move)
         chosen = choose_noble_deterministic(eligible)
         game.finalize_turn(chosen)
+        turns += 1
+        if turns >= max_turns:
+            break
 
-    winner = game.get_winner()
-    p_nn = game.game_state.players[0 if as_first else 1]
-    my_win = 1 if winner is p_nn else 0
-    my_pts = int(p_nn.prestige_points)
-    turns = int(game.game_state.turn_number)
-    return my_win, my_pts, turns
-
+    # Zakończenie: normalnie lub po limicie tur
+    if game.is_game_over():
+        winner = game.get_winner()
+        p_nn = game.game_state.players[0 if as_first else 1]
+        my_win = 1 if winner is p_nn else 0
+        my_pts = int(p_nn.prestige_points)
+        turns = int(game.game_state.turn_number)
+        return my_win, my_pts, turns
+    else:
+        # Finisz po limicie tur – rozstrzygnięcie jak w engine (prestige, tie-break len(cards))
+        players = game.game_state.players
+        winner_like_engine = sorted(players, key=lambda p: (-p.prestige_points, len(p.cards)))[0]
+        p_nn = players[0 if as_first else 1]
+        my_win = 1 if winner_like_engine is p_nn else 0
+        my_pts = int(p_nn.prestige_points)
+        return my_win, my_pts, turns
+    
 def main():
     ap = argparse.ArgumentParser(description="Headless eval NN vs GA")
     ap.add_argument("--seeds", type=int, default=32, help="Ile seedów (każdy seed = 2 gry, obie role)")
@@ -119,6 +187,7 @@ def main():
         w, pts, t = play_game(theta, ga_dna, as_first=False, game_seed=seed_second, tie_seed=tie_seed,
                               cards=cards, nobles=nobles)
         wins += w; games += 1; sum_pts += pts; sum_turns += t
+        print(f"[eval] seed {i+1}/{args.seeds} done")
 
     wr = wins / games if games else 0.0
     wr_lb = wilson_lower_bound(wr, games, cfg.WILSON_Z) if games else 0.0

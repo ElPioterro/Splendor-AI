@@ -111,15 +111,29 @@ class Game:
         if player.total_gems <= 8:
             for color, count in state.available_gems.items():
                 if count >= 4: moves.append(TakeTwoGems(color=color))
-        if len(player.reserved_cards) < 3:
+        # Rezerwacja: dozwolona tylko, jeśli nie przekroczymy limitu żetonów
+        can_reserve = len(player.reserved_cards) < 3
+        if can_reserve:
+            will_take_gold = state.gold_gems > 0  # rezerwacja daje złoto, jeśli jest dostępne
+            if will_take_gold and player.total_gems >= 10:
+                can_reserve = False  # rezerwacja dodałaby 11. żeton → blokuj
+
+        if can_reserve:
             for cards in state.visible_cards.values():
-                for card in cards: moves.append(ReserveVisibleCard(card=card))
+                for card in cards:
+                    moves.append(ReserveVisibleCard(card=card))
             for tier, deck in state.decks.items():
-                if deck: moves.append(ReserveFromDeck(tier=tier))
+                if deck:
+                    moves.append(ReserveFromDeck(tier=tier))
         buyable_cards = [card for tier_cards in state.visible_cards.values() for card in tier_cards]
         buyable_cards.extend(player.reserved_cards)
-        for card in set(buyable_cards): # set() to handle duplicates from visible and reserved
-            if self._can_player_afford(player, card): moves.append(BuyCard(card=card))
+        seen_ids = set()
+        for card in buyable_cards:
+            if card.id in seen_ids:
+                continue
+            seen_ids.add(card.id)
+            if self._can_player_afford(player, card):
+                moves.append(BuyCard(card=card))
         return moves
 
     def _can_player_afford(self, player: Player, card: Card) -> bool:
@@ -141,12 +155,25 @@ class Game:
         elif isinstance(move, TakeTwoGems):
             state.available_gems[move.color] -= 2; player.gems[move.color] += 2
         elif isinstance(move, ReserveVisibleCard):
-            self._remove_card_from_visible(move.card); player.reserved_cards.append(move.card)
-            if state.gold_gems > 0: state.gold_gems -= 1; player.gold_gems += 1
+            # Bezpiecznik limitu 10 żetonów przy rezerwacji ze złotem
+            if state.gold_gems > 0 and player.total_gems >= 10:
+                raise ValueError("Nie możesz rezerwować: masz już 10 żetonów, a w banku jest złoto.")
+            self._remove_card_from_visible(move.card)
+            player.reserved_cards.append(move.card)
+            if state.gold_gems > 0:
+                state.gold_gems -= 1
+                player.gold_gems += 1
+
         elif isinstance(move, ReserveFromDeck):
             if state.decks[move.tier]:
-                card = state.decks[move.tier].pop(); player.reserved_cards.append(card)
-                if state.gold_gems > 0: state.gold_gems -= 1; player.gold_gems += 1
+                # Bezpiecznik limitu 10 żetonów przy rezerwacji z talii
+                if state.gold_gems > 0 and player.total_gems >= 10:
+                    raise ValueError("Nie możesz rezerwować: masz już 10 żetonów, a w banku jest złoto.")
+                card = state.decks[move.tier].pop()
+                player.reserved_cards.append(card)
+                if state.gold_gems > 0:
+                    state.gold_gems -= 1
+                    player.gold_gems += 1
         elif isinstance(move, BuyCard):
             bonuses = player.bonuses; gold_to_pay = 0
             for color, cost_val in move.card.cost:                
